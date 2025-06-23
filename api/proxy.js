@@ -16,7 +16,7 @@ module.exports = async (req, res) => {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Referer': 'https://www.youtube.com/',
+        'Referer': new URL(url).origin,
       },
     });
 
@@ -38,15 +38,15 @@ module.exports = async (req, res) => {
       const baseUrl = new URL(url).origin;
       const proxyBase = '/api/proxy-resource?url=';
 
-      // リソースURLをプロキシURLに書き換え
-      data = data.replace(/(href|src|action|data)=["'](.*?)["']/gi, (match, attr, value) => {
+      // リソースURLを書き換え
+      data = data.replace(/(href|src|action|data|poster)=["'](.*?)["']/gi, (match, attr, value) => {
         let newValue = value;
         try {
           if (value.startsWith('http') || value.startsWith('//')) {
             newValue = `${proxyBase}${encodeURIComponent(value)}`;
           } else if (value.startsWith('/')) {
             newValue = `${proxyBase}${encodeURIComponent(baseUrl + value)}`;
-          } else if (!value.startsWith('#') && !value.startsWith('javascript:')) {
+          } else if (!value.startsWith('#') && !value.startsWith('javascript:') && !value.startsWith('data:')) {
             newValue = `${proxyBase}${encodeURIComponent(new URL(value, baseUrl).href)}`;
           }
         } catch (e) {
@@ -55,12 +55,29 @@ module.exports = async (req, res) => {
         return `${attr}="${newValue}"`;
       });
 
-      // インラインスクリプト内のURLを書き換え
+      // インラインスクリプトやJSON内のURLを書き換え
       data = data.replace(/['"](https?:\/\/[^'"]+)['"]/g, (match, url) => {
         return `"${proxyBase}${encodeURIComponent(url)}"`;
       });
 
-      // YouTubeの動画プレーヤー用にbaseタグを追加
+      // プリロードリンクの書き換え
+      data = data.replace(/<link[^>]+rel=["']preload["'][^>]+>/gi, (match) => {
+        return match.replace(/(href)=["'](.*?)["']/i, (m, attr, value) => {
+          let newValue = value;
+          try {
+            if (value.startsWith('http') || value.startsWith('//')) {
+              newValue = `${proxyBase}${encodeURIComponent(value)}`;
+            } else if (value.startsWith('/')) {
+              newValue = `${proxyBase}${encodeURIComponent(baseUrl + value)}`;
+            }
+          } catch (e) {
+            console.error(`Failed to rewrite preload URL: ${value}`, e);
+          }
+          return `${attr}="${newValue}"`;
+        });
+      });
+
+      // baseタグを追加
       data = data.replace('<head>', `<head><base href="${baseUrl}">`);
 
       // CSPとX-Frame-Optionsを無効化
