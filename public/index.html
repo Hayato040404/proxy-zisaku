@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>プロキシサイト</title>
+  <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <div id="root"></div>
+  <script type="text/babel">
+    const { useState } = React;
+
+    function App() {
+      const [url, setUrl] = useState('');
+      const [proxyUrl, setProxyUrl] = useState('');
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        if (!url) return;
+        try {
+          const response = await fetch('/api/proxy', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ url }),
+          });
+          const data = await response.json();
+          if (data.success) {
+            setProxyUrl(data.proxyUrl);
+          } else {
+            alert('プロキシの取得に失敗しました: ' + data.error);
+          }
+        } catch (error) {
+          alert('エラーが発生しました: ' + error.message);
+        }
+      };
+
+      return (
+        <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
+          <div className="w-full max-w-3xl bg-white rounded-lg shadow-lg p-6">
+            <h1 className="text-2xl font-bold mb-4 text-center">プロキシサイト</h1>
+            <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 mb-4">
+              <input
+                type="url"
+                value={url}
+                onChange={(e) => setUrl(e.target.value)}
+                placeholder="プロキシしたいURLを入力 (例: https://www.youtube.com)"
+                className="flex-1 p-2 border rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                required
+              />
+              <button
+                type="submit"
+                className="bg-blue-500 text-white px-4 py-2 rounded-md hover:bg-blue-600"
+              >
+                表示
+              </button>
+            </form>
+            {proxyUrl && (
+              <iframe
+                src={proxyUrl}
+                className="w-full h-[60vh] border rounded-md"
+                title="プロキシコンテンツ"
+                allowFullScreen
+              ></iframe>
+            )}
+          </div>
+        </div>
+      );
+    }
+
+    ReactDOM.render(<App />, document.getElementById('root'));
+  </script>
+</body>
+</html>
