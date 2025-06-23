@@ -17,6 +17,7 @@
     function App() {
       const [url, setUrl] = useState('');
       const [content, setContent] = useState('');
+      const proxyBase = '/api/proxy-resource?url=';
 
       const handleSubmit = async (e) => {
         e.preventDefault();
@@ -41,21 +42,21 @@
         if (content) {
           // フォーカス競合を防ぐ
           document.activeElement.blur();
-          // 動的リソースのプロキシ対応
+          // 動的リクエストをプロキシ経由にリダイレクト
           const script = document.createElement('script');
           script.text = `
             (function() {
               const originalFetch = window.fetch;
               window.fetch = function(url, ...args) {
-                if (typeof url === 'string' && !url.startsWith('/api/proxy-resource')) {
-                  url = '/api/proxy-resource?url=' + encodeURIComponent(url);
+                if (typeof url === 'string' && !url.startsWith('/api/proxy-resource') && !url.startsWith('data:') && !url.startsWith('blob:')) {
+                  url = '${proxyBase}' + encodeURIComponent(url);
                 }
                 return originalFetch(url, ...args);
               };
               const originalXhrOpen = XMLHttpRequest.prototype.open;
               XMLHttpRequest.prototype.open = function(method, url, ...args) {
-                if (!url.startsWith('/api/proxy-resource')) {
-                  url = '/api/proxy-resource?url=' + encodeURIComponent(url);
+                if (!url.startsWith('/api/proxy-resource') && !url.startsWith('data:') && !url.startsWith('blob:')) {
+                  url = '${proxyBase}' + encodeURIComponent(url);
                 }
                 return originalXhrOpen.call(this, method, url, ...args);
               };
@@ -67,8 +68,8 @@
 
       return (
         <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-          <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg p-6">
-            <h1 className="text-2xl font-bold mb-4 text-center">プロキシサイト</h1>
+          <div className="w-full max-w-5xl bg-white rounded-lg shadow-lg p-6">
+            <h1 className="text-2xl font-bold mb-4 text-center">制限回避プロキシサイト</h1>
             <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 mb-4">
               <input
                 type="url"
@@ -87,7 +88,7 @@
             </form>
             {content && (
               <div
-                className="w-full h-[70vh] border rounded-md overflow-auto"
+                className="w-full h-[80vh] border rounded-md overflow-auto"
                 dangerouslySetInnerHTML={{ __html: content }}
               ></div>
             )}
