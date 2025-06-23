@@ -7,43 +7,61 @@ module.exports = async (req, res) => {
   }
 
   const { url } = req.body;
-  if (!url || !url.startsWith('http')) {
+  if (!url || !url.match(/^https?:\/\//)) {
     return res.status(400).json({ success: false, error: 'Invalid URL' });
   }
 
   try {
     const response = await fetch(url, {
       headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+        'Referer': 'https://www.youtube.com/',
       },
     });
 
-    const contentType = response.headers.get('content-type');
+    if (!response.ok) {
+      return res.status(response.status).json({ success: false, error: `Failed to fetch: ${response.statusText}` });
+    }
+
+    const contentType = response.headers.get('content-type') || 'text/html';
     let data = await response.buffer();
 
-    // 動画ストリーミングの場合、データをそのまま返す
     if (contentType.includes('video') || contentType.includes('stream')) {
       res.setHeader('Content-Type', contentType);
       res.setHeader('Access-Control-Allow-Origin', '*');
       return res.status(200).send(data);
     }
 
-    // HTMLの場合、リソースURLをプロキシURLに書き換える
     if (contentType.includes('text/html')) {
       data = data.toString();
       const baseUrl = new URL(url).origin;
       const proxyBase = '/api/proxy-resource?url=';
 
-      // 相対URLをプロキシURLに変換
-      data = data.replace(/(href|src|action)=["'](.*?)["']/gi, (match, attr, value) => {
-        if (value.startsWith('http') || value.startsWith('//')) {
-          return `${attr}="${proxyBase}${encodeURIComponent(value)}"`;
-        } else if (value.startsWith('/')) {
-          return `${attr}="${proxyBase}${encodeURIComponent(baseUrl + value)}"`;
+      // リソースURLをプロキシURLに書き換え
+      data = data.replace(/(href|src|action|data)=["'](.*?)["']/gi, (match, attr, value) => {
+        let newValue = value;
+        try {
+          if (value.startsWith('http') || value.startsWith('//')) {
+            newValue = `${proxyBase}${encodeURIComponent(value)}`;
+          } else if (value.startsWith('/')) {
+            newValue = `${proxyBase}${encodeURIComponent(baseUrl + value)}`;
+          } else if (!value.startsWith('#') && !value.startsWith('javascript:')) {
+            newValue = `${proxyBase}${encodeURIComponent(new URL(value, baseUrl).href)}`;
+          }
+        } catch (e) {
+          console.error(`Failed to rewrite URL: ${value}`, e);
         }
-        return match;
+        return `${attr}="${newValue}"`;
       });
+
+      // インラインスクリプト内のURLを書き換え
+      data = data.replace(/['"](https?:\/\/[^'"]+)['"]/g, (match, url) => {
+        return `"${proxyBase}${encodeURIComponent(url)}"`;
+      });
+
+      // YouTubeの動画プレーヤー用にbaseタグを追加
+      data = data.replace('<head>', `<head><base href="${baseUrl}">`);
 
       // CSPとX-Frame-Optionsを無効化
       res.setHeader('Content-Security-Policy', '');
@@ -54,6 +72,7 @@ module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).send(data);
   } catch (error) {
-    res.status(500).json({ success: false, error: error.message });
+    console.error('Proxy error:', error);
+    res.status(500).json({ success: false, error: `Server error: ${error.message}` });
   }
 };
