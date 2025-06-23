@@ -39,14 +39,35 @@
 
       useEffect(() => {
         if (content) {
-          // コンテンツ注入後にフォーカスをリセット
+          // フォーカス競合を防ぐ
           document.activeElement.blur();
+          // 動的リソースのプロキシ対応
+          const script = document.createElement('script');
+          script.text = `
+            (function() {
+              const originalFetch = window.fetch;
+              window.fetch = function(url, ...args) {
+                if (typeof url === 'string' && !url.startsWith('/api/proxy-resource')) {
+                  url = '/api/proxy-resource?url=' + encodeURIComponent(url);
+                }
+                return originalFetch(url, ...args);
+              };
+              const originalXhrOpen = XMLHttpRequest.prototype.open;
+              XMLHttpRequest.prototype.open = function(method, url, ...args) {
+                if (!url.startsWith('/api/proxy-resource')) {
+                  url = '/api/proxy-resource?url=' + encodeURIComponent(url);
+                }
+                return originalXhrOpen.call(this, method, url, ...args);
+              };
+            })();
+          `;
+          document.body.appendChild(script);
         }
       }, [content]);
 
       return (
         <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
-          <div className="w-full max-w-3xl bg-white rounded-lg shadow-lg p-6">
+          <div className="w-full max-w-4xl bg-white rounded-lg shadow-lg p-6">
             <h1 className="text-2xl font-bold mb-4 text-center">プロキシサイト</h1>
             <form onSubmit={handleSubmit} className="flex flex-col sm:flex-row gap-2 mb-4">
               <input
@@ -66,7 +87,7 @@
             </form>
             {content && (
               <div
-                className="w-full h-[60vh] border rounded-md overflow-auto"
+                className="w-full h-[70vh] border rounded-md overflow-auto"
                 dangerouslySetInnerHTML={{ __html: content }}
               ></div>
             )}
