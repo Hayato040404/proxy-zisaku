@@ -3,19 +3,18 @@ import http from "http";
 import { parse as parseUrl } from "url";
 
 export default async function handler(req, res) {
+  // CORS (OPTIONSプリフライト対応)
+  if (req.method === "OPTIONS") {
+    res.writeHead(204, {
+      "Access-Control-Allow-Origin": "*",
+      "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
+      "Access-Control-Allow-Headers": req.headers["access-control-request-headers"] || "*",
+      "Access-Control-Allow-Credentials": "true"
+    });
+    res.end();
+    return;
+  }
   try {
-    // Preflight (CORS)対応: OPTIONSリクエストの場合は即CORSヘッダを返して終了
-    if (req.method === "OPTIONS") {
-      res.writeHead(204, {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "GET,POST,PUT,PATCH,DELETE,OPTIONS",
-        "Access-Control-Allow-Headers": req.headers["access-control-request-headers"] || "*",
-        "Access-Control-Allow-Credentials": "true"
-      });
-      res.end();
-      return;
-    }
-
     let { pathname } = parseUrl(req.url);
     if (!pathname || pathname === "/") {
       res.writeHead(400, { "content-type": "text/plain", "Access-Control-Allow-Origin": "*" });
@@ -46,11 +45,9 @@ export default async function handler(req, res) {
       },
       proxyRes => {
         let resHeaders = { ...proxyRes.headers };
-        // CORSヘッダを必ず追加
         resHeaders["access-control-allow-origin"] = "*";
         resHeaders["access-control-allow-credentials"] = "true";
         resHeaders["access-control-expose-headers"] = "*";
-        // cookie関連は消す
         if ("set-cookie" in resHeaders) delete resHeaders["set-cookie"];
         res.writeHead(proxyRes.statusCode, resHeaders);
         proxyRes.pipe(res);
