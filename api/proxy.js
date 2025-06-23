@@ -12,11 +12,12 @@ module.exports = async (req, res) => {
   }
 
   try {
+    const parsedUrl = new URL(url);
     const response = await fetch(url, {
       headers: {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
         'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Referer': new URL(url).origin,
+        'Referer': parsedUrl.origin,
       },
     });
 
@@ -27,15 +28,19 @@ module.exports = async (req, res) => {
     const contentType = response.headers.get('content-type') || 'text/html';
     let data = await response.buffer();
 
+    // CORSヘッダーを設定
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
     if (contentType.includes('video') || contentType.includes('stream')) {
       res.setHeader('Content-Type', contentType);
-      res.setHeader('Access-Control-Allow-Origin', '*');
       return res.status(200).send(data);
     }
 
     if (contentType.includes('text/html')) {
       data = data.toString();
-      const baseUrl = new URL(url).origin;
+      const baseUrl = parsedUrl.origin;
       const proxyBase = '/api/proxy-resource?url=';
 
       // リソースURLを書き換え
@@ -46,7 +51,7 @@ module.exports = async (req, res) => {
             newValue = `${proxyBase}${encodeURIComponent(value)}`;
           } else if (value.startsWith('/')) {
             newValue = `${proxyBase}${encodeURIComponent(baseUrl + value)}`;
-          } else if (!value.startsWith('#') && !value.startsWith('javascript:') && !value.startsWith('data:')) {
+          } else if (!value.startsWith('#') && !value.startsWith('javascript:') && !value.startsWith('data:') && !value.startsWith('blob:')) {
             newValue = `${proxyBase}${encodeURIComponent(new URL(value, baseUrl).href)}`;
           }
         } catch (e) {
@@ -69,6 +74,8 @@ module.exports = async (req, res) => {
               newValue = `${proxyBase}${encodeURIComponent(value)}`;
             } else if (value.startsWith('/')) {
               newValue = `${proxyBase}${encodeURIComponent(baseUrl + value)}`;
+            } else if (!value.startsWith('#') && !value.startsWith('javascript:') && !value.startsWith('data:') && !value.startsWith('blob:')) {
+              newValue = `${proxyBase}${encodeURIComponent(new URL(value, baseUrl).href)}`;
             }
           } catch (e) {
             console.error(`Failed to rewrite preload URL: ${value}`, e);
@@ -80,13 +87,12 @@ module.exports = async (req, res) => {
       // baseタグを追加
       data = data.replace('<head>', `<head><base href="${baseUrl}">`);
 
-      // CSPとX-Frame-Optionsを無効化
+      // セキュリティヘッダーを無効化
       res.setHeader('Content-Security-Policy', '');
       res.removeHeader('X-Frame-Options');
     }
 
     res.setHeader('Content-Type', contentType);
-    res.setHeader('Access-Control-Allow-Origin', '*');
     res.status(200).send(data);
   } catch (error) {
     console.error('Proxy error:', error);
