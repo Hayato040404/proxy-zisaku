@@ -13,15 +13,19 @@
   <div id="root"></div>
   <script type="text/babel">
     const { useState, useEffect } = React;
+    const { createRoot } = ReactDOM;
 
     function App() {
       const [url, setUrl] = useState('');
       const [content, setContent] = useState('');
-      const proxyBase = '/api/proxy-resource?url=';
+      const proxyBase = window.location.origin + '/api/proxy-resource?url=';
 
       const handleSubmit = async (e) => {
         e.preventDefault();
-        if (!url) return;
+        if (!url || !url.match(/^https?:\/\//)) {
+          alert('有効なURLを入力してください');
+          return;
+        }
         try {
           const response = await fetch('/api/proxy', {
             method: 'POST',
@@ -40,23 +44,27 @@
 
       useEffect(() => {
         if (content) {
-          // フォーカス競合を防ぐ
           document.activeElement.blur();
-          // 動的リクエストをプロキシ経由にリダイレクト
           const script = document.createElement('script');
           script.text = `
             (function() {
               const originalFetch = window.fetch;
               window.fetch = function(url, ...args) {
                 if (typeof url === 'string' && !url.startsWith('/api/proxy-resource') && !url.startsWith('data:') && !url.startsWith('blob:')) {
-                  url = '${proxyBase}' + encodeURIComponent(url);
+                  try {
+                    new URL(url, window.location.origin);
+                    url = '${proxyBase}' + encodeURIComponent(url);
+                  } catch (e) {}
                 }
                 return originalFetch(url, ...args);
               };
               const originalXhrOpen = XMLHttpRequest.prototype.open;
               XMLHttpRequest.prototype.open = function(method, url, ...args) {
                 if (!url.startsWith('/api/proxy-resource') && !url.startsWith('data:') && !url.startsWith('blob:')) {
-                  url = '${proxyBase}' + encodeURIComponent(url);
+                  try {
+                    new URL(url, window.location.origin);
+                    url = '${proxyBase}' + encodeURIComponent(url);
+                  } catch (e) {}
                 }
                 return originalXhrOpen.call(this, method, url, ...args);
               };
@@ -97,7 +105,8 @@
       );
     }
 
-    ReactDOM.render(<App />, document.getElementById('root'));
+    const root = createRoot(document.getElementById('root'));
+    root.render(<App />);
   </script>
 </body>
 </html>
