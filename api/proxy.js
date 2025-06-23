@@ -2,6 +2,14 @@ const fetch = require('node-fetch');
 const { URL } = require('url');
 
 module.exports = async (req, res) => {
+  // OPTIONSリクエストを処理（プリフライト対応）
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(200).send();
+  }
+
   if (req.method !== 'POST') {
     return res.status(405).json({ success: false, error: 'Method not allowed' });
   }
@@ -32,6 +40,9 @@ module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+
+    // CORB回避のため、JSONレスポンスを避ける
+    res.setHeader('X-Content-Type-Options', 'nosniff');
 
     if (contentType.includes('video') || contentType.includes('stream')) {
       res.setHeader('Content-Type', contentType);
