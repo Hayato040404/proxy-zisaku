@@ -41,7 +41,7 @@ module.exports = async (req, res) => {
     const contentType = response.headers.get('content-type') || 'application/octet-stream';
     let data = await response.buffer();
 
-    // JSやCSSの場合、URLを書き換え
+    // JSやCSS内のURLを書き換え
     if (contentType.includes('javascript') || contentType.includes('css')) {
       data = data.toString();
       const baseUrl = new URL(url).origin;
@@ -53,6 +53,8 @@ module.exports = async (req, res) => {
             newValue = `${proxyBase}${encodeURIComponent(value)}`;
           } else if (value.startsWith('/')) {
             newValue = `${proxyBase}${encodeURIComponent(baseUrl + value)}`;
+          } else if (!value.startsWith('#') && !value.startsWith('data:') && !value.startsWith('blob:')) {
+            newValue = `${proxyBase}${encodeURIComponent(new URL(value, baseUrl).href)}`;
           }
         } catch (e) {
           console.error(`Failed to rewrite URL in resource: ${value}`, e);
@@ -66,6 +68,8 @@ module.exports = async (req, res) => {
 
     res.setHeader('Content-Type', contentType);
     res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
     res.status(200).send(data);
   } catch (error) {
     console.error('Proxy resource error:', error);
