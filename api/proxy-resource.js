@@ -2,6 +2,14 @@ const fetch = require('node-fetch');
 const { URL } = require('url');
 
 module.exports = async (req, res) => {
+  // OPTIONSリクエストを処理
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    return res.status(200).send();
+  }
+
   let { url } = req.query;
 
   if (!url) {
@@ -17,7 +25,7 @@ module.exports = async (req, res) => {
   try {
     new URL(url);
   } catch (e) {
-    const baseUrl = 'https://www.youtube.com';
+    const baseUrl = 'https://www.youtube.com'; // デフォルトベースURL
     url = new URL(url, baseUrl).href;
   }
 
@@ -46,6 +54,7 @@ module.exports = async (req, res) => {
       data = data.toString();
       const baseUrl = new URL(url).origin;
       const proxyBase = '/api/proxy-resource?url=';
+      // CSSのurl()関数を書き換え
       data = data.replace(/(url\(['"]?)(.*?)(['"]?\))/gi, (match, prefix, value, suffix) => {
         let newValue = value;
         try {
@@ -61,6 +70,7 @@ module.exports = async (req, res) => {
         }
         return `${prefix}${newValue}${suffix}`;
       });
+      // インラインURLを書き換え
       data = data.replace(/['"](https?:\/\/[^'"]+)['"]/g, (match, url) => {
         return `"${proxyBase}${encodeURIComponent(url)}"`;
       });
@@ -70,6 +80,7 @@ module.exports = async (req, res) => {
     res.setHeader('Access-Control-Allow-Origin', '*');
     res.setHeader('Access-Control-Allow-Methods', 'GET, POST, OPTIONS');
     res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
+    res.setHeader('X-Content-Type-Options', 'nosniff');
     res.status(200).send(data);
   } catch (error) {
     console.error('Proxy resource error:', error);
