@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>プロキシサイト</title>
+  <title>unknow</title>
   <script src="https://cdn.jsdelivr.net/npm/react@18/umd/react.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/react-dom@18/umd/react-dom.development.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7/babel.min.js"></script>
@@ -16,7 +16,7 @@
 
     function App() {
       const [url, setUrl] = useState('');
-      const [proxyUrl, setProxyUrl] = useState('');
+      const [content, setContent] = useState('');
 
       const handleSubmit = async (e) => {
         e.preventDefault();
@@ -27,12 +27,8 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url }),
           });
-          const data = await response.json();
-          if (data.success) {
-            setProxyUrl(data.proxyUrl);
-          } else {
-            alert('プロキシの取得に失敗しました: ' + data.error);
-          }
+          const data = await response.text();
+          setContent(data);
         } catch (error) {
           alert('エラーが発生しました: ' + error.message);
         }
@@ -58,13 +54,11 @@
                 表示
               </button>
             </form>
-            {proxyUrl && (
-              <iframe
-                src={proxyUrl}
-                className="w-full h-[60vh] border rounded-md"
-                title="プロキシコンテンツ"
-                allowFullScreen
-              ></iframe>
+            {content && (
+              <div
+                className="w-full h-[60vh] border rounded-md overflow-auto"
+                dangerouslySetInnerHTML={{ __html: content }}
+              ></div>
             )}
           </div>
         </div>
