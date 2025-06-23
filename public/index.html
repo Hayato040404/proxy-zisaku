@@ -12,7 +12,7 @@
 <body>
   <div id="root"></div>
   <script type="text/babel">
-    const { useState } = React;
+    const { useState, useEffect } = React;
 
     function App() {
       const [url, setUrl] = useState('');
@@ -27,12 +27,22 @@
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ url }),
           });
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${await response.text()}`);
+          }
           const data = await response.text();
           setContent(data);
         } catch (error) {
           alert('エラーが発生しました: ' + error.message);
         }
       };
+
+      useEffect(() => {
+        if (content) {
+          // コンテンツ注入後にフォーカスをリセット
+          document.activeElement.blur();
+        }
+      }, [content]);
 
       return (
         <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
